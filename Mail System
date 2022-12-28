@@ -1,0 +1,878 @@
+<?php
+####################################################################################
+####################################################################################
+//Ajaxスタート
+function my_ajax_url() {
+?>
+<script>var $AjaxUrl = '<?php echo admin_url('admin-ajax.php'); ?>';</script>
+<?php
+}
+add_action('wp_footer', 'my_ajax_url', 1);
+?>
+
+<?php
+####################################################################################
+####################################################################################
+// メール送信機能
+function Exsists_Mail(){
+
+$con_result = Connect();
+
+if($con_result[0]==="SUCCESS"){
+
+if($_SERVER["REQUEST_METHOD"] === "POST"){
+if( isset($_POST["Exsists_Mail_ACTION"]) ){
+
+$office_url = $_POST["OFFICE_URL"];
+$custom_permalink = str_replace("http://koutsujikosos.com/" , "" , $office_url);
+// var_dump($custom_permalink);
+
+$con_result[1]->beginTransaction();
+$stmts = $con_result[1]->query("SELECT
+*
+FROM wp_postmeta
+WHERE meta_value LIKE '$custom_permalink' AND meta_key LIKE 'custom_permalink' ");
+$post_id = $stmts->fetchAll();
+
+$post_id = intval($post_id[0]["post_id"]) ;
+
+$stmts = $con_result[1]->query("SELECT
+meta_value
+FROM wp_postmeta WHERE post_id = $post_id AND meta_key LIKE 'OperatorEmail' ");
+$OperatorEmail = $stmts->fetchAll();
+$con_result[1]->commit();
+
+// var_dump($OperatorEmail);
+if( !empty($OperatorEmail) ){
+// $OperatorEmail = $OperatorEmail[0]["meta_value"];
+echo "EXISTS";
+}else{
+echo "NO_EXISTS";
+}
+
+}
+}//mehod
+}//sql
+
+}//func_exists_mail
+add_action('wp_ajax_nopriv_Exsists_Mail_Action', 'Exsists_Mail');
+add_action('wp_ajax_Exsists_Mail_Action', 'Exsists_Mail');
+
+
+################## 送信ボタン押し下し後
+function Contact_Select_Action(){
+
+if($_SERVER["REQUEST_METHOD"] === "POST"){
+if( isset($_POST["SELECT_ACTION"]) ){
+// var_dump($_POST);
+
+$office_name = $_POST["OFFICE_NAME"];
+$office_url  = $_POST["OFFICE_URL"];
+$office_tel  = $_POST["OFFICE_TEL"];
+
+$custom_permalink = str_replace("http://koutsujikosos.com/" , "" , $office_url);
+
+$con_result = Connect();
+if($con_result[0]==="SUCCESS"){
+$con_result[1]->beginTransaction();
+$stmts = $con_result[1]->query("SELECT
+*
+FROM wp_postmeta
+WHERE meta_value LIKE '$custom_permalink' AND meta_key LIKE 'custom_permalink' ");
+$post_id = $stmts->fetchAll();
+
+$post_id = intval($post_id[0]["post_id"]) ;
+
+$stmts = $con_result[1]->query("SELECT
+meta_value
+FROM wp_postmeta WHERE post_id = $post_id AND meta_key LIKE 'OperatorEmail' ");
+$OperatorEmail = $stmts->fetchAll();
+$con_result[1]->commit();
+
+//mail_address
+$OperatorEmail = $OperatorEmail[0]["meta_value"];
+}else{
+}//success
+
+##### POST VALUE
+$c_shimei    = $_POST["FORM_SERIAL"][0]["value"];//必須
+$c_email     = $_POST["FORM_SERIAL"][1]["value"];//必須
+$c_tel       = $_POST["FORM_SERIAL"][2]["value"];//必須
+$c_sex       = $_POST["FORM_SERIAL"][3]["value"];//noselect
+$c_sex       === "noselect" ? $c_sex = "未選択" : $c_sex;
+$c_age       = $_POST["FORM_SERIAL"][4]["value"];//blank
+$c_age       ==="" ? $c_age = "未記入" : $c_age;
+$c_area1     = $_POST["FORM_SERIAL"][5]["value"];//選択してください
+$c_area1     ==="選択してください" ? $c_area1 = "未選択" : $c_area1;
+$c_area2     = $_POST["FORM_SERIAL"][6]["value"];//blank
+$c_area2     ==="" ? $c_area2 = "未記入" : $c_area2;
+$c_art       = $_POST["FORM_SERIAL"][7]["value"];//blank
+$c_art       ==="" ? $c_art = "未記入" : $c_art;
+
+
+### 内部エンコーディング明示
+mb_language("japanese");
+mb_internal_encoding("UTF-8");
+
+/*Mail_contents*/
+### TO Admin
+/*Date*/
+$year    = date_i18n("Y");
+$month   = date_i18n("m");
+$day     = date_i18n("d");
+$hour    = date_i18n("H");
+$minutes = date_i18n("i");
+$second  = date_i18n("s");
+$micro   = date_i18n("U");
+$dates =$year."年".$month."月".$day."日".$hour."時".$minutes."分".$second."秒";
+
+$a_sub     ="【ホームページよりお問い合わせ】交通事故の慰謝料・示談SOS" ;
+$a_subject = mb_encode_mimeheader($a_sub, 'ISO-2022-JP', 'UTF-8');
+$a_Body    = "日時 : ".$dates."<BR><BR>";
+$a_Body   .= "お名前 : ".$c_shimei."<BR><BR>" ;
+$a_Body   .= "メールアドレス : ".$c_email."<BR><BR>" ;
+$a_Body   .= "電話番号 : ".$c_tel."<BR><BR>" ;
+$a_Body   .= "性別 : ".$c_sex."<BR><BR>" ;
+$a_Body   .= "年齢 : ".$c_age."<BR><BR>" ;
+$a_Body   .= "お住まいの地域 : ".$c_area1."<BR><BR>" ;
+$a_Body   .= "市区町村 : ".$c_area2."<BR><BR>" ;
+$a_Body   .= "お問合せ内容 : ".$c_art."<BR>" ;
+
+$a_Body    = mb_convert_encoding($a_Body, "JIS", "UTF-8");
+
+// echo $a_subject;
+// echo $a_Body;
+
+### TO Client
+$c_sub     = "【受付確認】交通事故の慰謝料・示談SOS" ;
+$c_subject = mb_encode_mimeheader($c_sub, 'ISO-2022-JP', 'UTF-8');
+
+$c_Body   .= $c_shimei." 様"."<BR><BR>" ;
+$c_Body   .= "交通事故の慰謝料・示談SOSをご利用いただき、誠にありがとうございます。"."<BR><BR>" ;
+$c_Body   .="以下の内容にてお問い合わせを受け付けました。"."<BR><BR>";
+$c_Body   .="今後は、".$office_name. " 様より、直接ご返答させて頂きますのでしばらくお待ち下さいませ。"."<BR><BR>" ;
+$c_Body   .="問い合わせした事務所はこちら"."<BR>" ;
+$c_Body   .="$office_url"."<BR><BR><BR>" ;
+$c_Body   .="ご相談内容はこちら"."<BR>" ;
+$c_Body   .= "────────────────────────────────"."<BR>" ;
+$c_Body   .= "■お名前"."<BR><BR>" ;
+$c_Body   .= $c_shimei."<BR><BR>" ;
+$c_Body   .= "■メールアドレス"."<BR><BR>" ;
+$c_Body   .= $c_email."<BR><BR>" ;
+$c_Body   .= "■電話番号"."<BR><BR>" ;
+$c_Body   .= $c_tel."<BR><BR>" ;
+$c_Body   .= "■性別"."<BR><BR>" ;
+$c_Body   .= $c_sex."<BR><BR>" ;
+$c_Body   .= "■年齢"."<BR><BR>" ;
+$c_Body   .= $c_age."<BR><BR>" ;
+$c_Body   .= "■お住まいの地域"."<BR><BR>" ;
+$c_Body   .= $c_area1."<BR><BR>" ;
+$c_Body   .= "■市区町村"."<BR><BR>" ;
+$c_Body   .= $c_area2."<BR><BR>" ;
+$c_Body   .= "■お問合せ内容"."<BR><BR>" ;
+$c_Body   .= $c_art."<BR><BR><BR>" ;
+$c_Body   .= "────────────────────────────────"."<BR><BR>" ;
+$c_Body   .= "※こちらのメールに心あたりのない方は、お手数ですが本メールを破棄してください。"."<BR><BR>" ;
+$c_Body   .= "========================================"."<BR>";
+$c_Body   .= "交通事故の慰謝料・示談SOS"."<BR>";
+$c_Body   .= "https://www.koutsujikosos.com/"."<BR><BR>";
+$c_Body   .= "お問い合わせはこちらから"."<BR>";
+$c_Body   .= "https://www.koutsujikosos.com/mail"."<BR>";
+$c_Body   .= "========================================"."<BR><BR>";
+
+$c_Body    = mb_convert_encoding($c_Body, "JIS", "UTF-8");
+
+// echo $c_subject;
+// echo $c_Body;
+
+### TO Bengoshi_Office
+$b_sub     = "【交通事故の慰謝料・示談SOSよりお問い合わせ】".$office_name." 様" ;
+$b_subject = mb_encode_mimeheader($b_sub, 'ISO-2022-JP', 'UTF-8');
+
+$b_Body    = $office_name." 様"."<BR>";
+$b_Body   .= "交通事故の慰謝料・示談SOSをご利用いただき、誠にありがとうございます。"."<BR><BR>";
+$b_Body   .= $c_shimei." 様より以下内容でご相談が届いておりますので、お知らせいたします。"."<BR><BR>";
+$b_Body   .= "ご返答は".$c_shimei." 様へ直接お問い合わせいただけますよう、よろしくお願い致します。"."<BR><BR>";
+$b_Body   .= "────────────────────────────────"."<BR>";
+$b_Body   .= "■お名前"."<BR>" ;
+$b_Body   .= $c_shimei."<BR>" ;
+$b_Body   .= "■メールアドレス"."<BR>" ;
+$b_Body   .= $c_email."<BR>" ;
+$b_Body   .= "■電話番号"."<BR>" ;
+$b_Body   .= $c_tel."<BR>" ;
+$b_Body   .= "■性別"."<BR>" ;
+$b_Body   .= $c_sex."<BR>" ;
+$b_Body   .= "■年齢"."<BR>" ;
+$b_Body   .= $c_age."<BR>" ;
+$b_Body   .= "■お住まいの地域"."<BR>" ;
+$b_Body   .= $c_area1."<BR>" ;
+$b_Body   .= "■市区町村"."<BR>" ;
+$b_Body   .= $c_area2."<BR>" ;
+$b_Body   .= "■お問合せ内容"."<BR>" ;
+$b_Body   .= $c_art."<BR><BR><BR>" ;
+$b_Body   .= "────────────────────────────────"."<BR><BR>" ;
+$b_Body   .= "※こちらのメールに心あたりのない方は、お手数ですが本メールを破棄してください。"."<BR><BR>" ;
+$b_Body   .= "========================================"."<BR>";
+$b_Body   .= "交通事故の慰謝料・示談SOS"."<BR>";
+$b_Body   .= "https://www.koutsujikosos.com/"."<BR><BR>";
+$b_Body   .= "お問い合わせはこちらから"."<BR>";
+$b_Body   .= "https://www.koutsujikosos.com/mail"."<BR>";
+$b_Body   .= "========================================"."<BR><BR>";
+
+$b_Body    = mb_convert_encoding($b_Body, "JIS", "UTF-8");
+
+// echo $b_subject;
+// echo $b_Body;
+
+############### TO 代理店
+$d_sub     = "【交通事故の慰謝料・示談SOSよりお問い合わせ】"."●●代理店 様" ;
+$d_subject = mb_encode_mimeheader($d_sub, 'ISO-2022-JP', 'UTF-8');
+
+$d_Body     = "●●代理店 様"."<BR><BR><BR>";
+$d_Body    .= "交通事故の慰謝料・示談SOSをご利用いただき、誠にありがとうございます。"."<BR><BR>";
+$d_Body    .= "以下の内容で問い合わせを受け付けましたので、後ほど担当者よりご返答させていただきます"."<BR><BR><BR>";
+$d_Body    .= "────────────────────────────────"."<BR><BR>";
+$d_Body    .= "■お問い合わせ内容"."<BR><BR><BR>";
+$d_Body    .= "■貴事務所名"."<BR><BR>";
+$d_Body    .= "代理店名"."<BR><BR>";
+$d_Body    .= "■お名前"."<BR><BR>" ;
+$d_Body    .= $c_shimei."<BR><BR>" ;
+$d_Body    .= "■メールアドレス"."<BR><BR>" ;
+$d_Body    .= $c_email."<BR><BR>" ;
+$d_Body    .= "■電話番号"."<BR><BR>" ;
+$d_Body    .= $c_tel."<BR><BR>" ;
+$d_Body    .= "■お住まいの地域"."<BR><BR>" ;
+$d_Body    .= $c_area1."<BR><BR>" ;
+$d_Body    .= "■市区町村"."<BR><BR>" ;
+$d_Body    .= $c_area2."<BR><BR>" ;
+$d_Body    .= "■お問合せ内容"."<BR><BR>" ;
+$d_Body    .= "不掲載"."<BR><BR>" ;
+$d_Body    .= "────────────────────────────────"."<BR><BR>" ;
+$d_Body    .= "※こちらのメールに心あたりのない方は、お手数ですが本メールを破棄してください。"."<BR><BR>" ;
+$d_Body    .= "========================================"."<BR><BR>";
+$d_Body    .= "交通事故の慰謝料・示談SOS"."<BR>";
+$d_Body    .= "https://www.koutsujikosos.com/"."<BR><BR>";
+$d_Body    .= "========================================"."<BR><BR>";
+
+
+#####################################
+
+
+require_once '/home/whitebear03/koutsujikosos.com/public_html/wp-includes/class-phpmailer.php';
+
+
+// $admin          = "●●●●●●●●●●●●●●●●●●●●";
+// $c_mail         = "●●●●●●●●●●●●●●●●●●●●";
+// $OperatorEmail  = "●●●●●●●●●●●●●●●●●●●●";
+// $DAIRITEN       = "●●●●●●●●●●●●●●●●●●●●";
+$admin             = "●●●●●●●●●●●●●●●●●●●●";
+$c_mail            = "●●●●●●●●●●●●●●●●●●●●";
+$OperatorEmail     = "●●●●●●●●●●●●●●●●●●●●";
+
+
+
+##################### メール送信パラメータ
+$TO  = [$admin , $c_mail , $OperatorEmail] ;
+
+$sender       = '●●●●●●●●●●●●●●●●●●●●';
+$senderName   = '交通事故の慰謝料・示談SOS';
+$senderName   =  mb_encode_mimeheader(mb_convert_encoding($senderName, "JIS", "UTF-8"));
+
+$usernameSmtp = '●●●●●●●●●●●●●●●●●●●●';
+$passwordSmtp = '●●●●●●●●';
+$host = '●●●●●●●●';
+$port = 587;
+// var_dump($mail->isSMTP());
+
+foreach($TO as $key=>$val){
+
+if($key === 0 ){
+try {
+// Specify the SMTP settings.
+$mail = new PHPMailer();
+$mail->Encoding = "7bit";
+$mail->CharSet = 'ISO-2022-JP';
+$mail->isSMTP();
+$mail->setFrom($sender, $senderName);
+$mail->Username   = $usernameSmtp;
+$mail->Password   = $passwordSmtp;
+$mail->Host       = $host;
+$mail->Port       = $port;
+$mail->SMTPAuth   = true;
+$mail->SMTPSecure = 'tls';
+// $mail->addCustomHeader('X-SES-CONFIGURATION-SET', $configurationSet);
+
+// Specify the message recipients.
+$mail->addAddress($TO[0]);
+// You can also add CC, BCC, and additional To recipients here.
+
+// Specify the content of the message.
+$mail->isHTML(true);
+$mail->Subject    = $c_subject;
+$mail->Body       = $c_Body;
+$mail->AltBody    = $c_Body;
+$mail->Send();
+
+echo "データが送信されました。".","  ,PHP_EOL;
+echo "各担当者より、ご連絡お待ちください。" ,PHP_EOL;
+
+} catch (phpmailerException $e) {
+echo "An error occurred[99]. {$e->errorMessage()}", PHP_EOL; //Catch errors from PHPMailer.
+} catch (PHPMailer\PHPMailer\Exception $e) {
+echo "Email not sent[100]. {$mail->ErrorInfo}", PHP_EOL; //Catch errors from Amazon SES.
+}
+
+}//admin
+
+if($key === 1 ){
+try {
+// Specify the SMTP settings.
+$mail = new PHPMailer();
+$mail->Encoding = "7bit";
+$mail->CharSet = 'ISO-2022-JP';
+$mail->isSMTP();
+$mail->setFrom($sender, $senderName);
+$mail->Username   = $usernameSmtp;
+$mail->Password   = $passwordSmtp;
+$mail->Host       = $host;
+$mail->Port       = $port;
+$mail->SMTPAuth   = true;
+$mail->SMTPSecure = 'tls';
+// $mail->addCustomHeader('X-SES-CONFIGURATION-SET', $configurationSet);
+
+// Specify the message recipients.
+$mail->addAddress($TO[1]);
+// You can also add CC, BCC, and additional To recipients here.
+
+// Specify the content of the message.
+$mail->isHTML(true);
+$mail->Subject    = $c_subject;
+$mail->Body       = $c_Body;
+$mail->AltBody    = $c_Body;
+$mail->Send();
+
+echo "データが送信されました。".","  ,PHP_EOL;
+echo "各担当者より、ご連絡お待ちください。" ,PHP_EOL;
+
+} catch (phpmailerException $e) {
+echo "An error occurred[99]. {$e->errorMessage()}", PHP_EOL; //Catch errors from PHPMailer.
+} catch (PHPMailer\PHPMailer\Exception $e) {
+echo "Email not sent[100]. {$mail->ErrorInfo}", PHP_EOL; //Catch errors from Amazon SES.
+}
+
+}//ユーザー
+
+if($key === 2 ){
+
+try {
+// Specify the SMTP settings.
+$mail = new PHPMailer();
+$mail->Encoding = "7bit";
+$mail->CharSet = 'ISO-2022-JP';
+$mail->isSMTP();
+$mail->setFrom($sender, $senderName);
+$mail->Username   = $usernameSmtp;
+$mail->Password   = $passwordSmtp;
+$mail->Host       = $host;
+$mail->Port       = $port;
+$mail->SMTPAuth   = true;
+$mail->SMTPSecure = 'tls';
+// $mail->addCustomHeader('X-SES-CONFIGURATION-SET', $configurationSet);
+
+// Specify the message recipients.
+$mail->addAddress($TO[2]);
+// You can also add CC, BCC, and additional To recipients here.
+
+// Specify the content of the message.
+$mail->isHTML(true);
+$mail->Subject    = $b_subject;
+$mail->Body       = $b_Body;
+$mail->AltBody    = $b_Body;
+$mail->Send();
+
+echo "データが送信されました。".","  ,PHP_EOL;
+echo "各担当者より、ご連絡お待ちください。" ,PHP_EOL;
+
+} catch (phpmailerException $e) {
+echo "An error occurred[99]. {$e->errorMessage()}", PHP_EOL; //Catch errors from PHPMailer.
+} catch (PHPMailer\PHPMailer\Exception $e) {
+echo "Email not sent[100]. {$mail->ErrorInfo}", PHP_EOL; //Catch errors from Amazon SES.
+}
+
+}//担当者様
+
+}//each
+
+
+}//isset
+}//method
+
+}//func_co_select_action
+add_action('wp_ajax_Contact_Select_Action', 'Contact_Select_Action');
+add_action('wp_ajax_nopriv_Contact_Select_Action', 'Contact_Select_Action');
+
+
+
+####################################################################################
+####################################################################################
+//管理画面での地域選択カスタマイズ
+function mk3_admin_script() {
+
+global $post_type;
+if( is_admin() && $post_type == "office" ){
+wp_enqueue_script( 'mk3_admin_script', get_template_directory_uri().'/js/mk3_admin_area_checkbox.js', array('jquery'), '', true);
+}
+
+
+}
+add_action("admin_print_scripts-post.php", "mk3_admin_script");
+
+
+function Admin_Area_Changer_Recieve() {
+if($_SERVER["REQUEST_METHOD"] === "POST"){
+if( isset($_POST["Admin_Area_Changer_Action"]) ){
+
+$area_term = $_POST["Area_Term"];
+$con_result = Connect();
+
+if($con_result[0]==="SUCCESS"){
+$con_result[1]->beginTransaction();
+
+$stmts1 = $con_result[1]->query(
+"SELECT term_id FROM wp_term_taxonomy WHERE parent = '$area_term'"
+);
+$stmt1 = $stmts1->fetchAll();
+
+$stmts2 = $con_result[1]->query(
+"SELECT term_id FROM wp_term_taxonomy WHERE parent IN (SELECT term_id FROM wp_term_taxonomy WHERE parent = '$area_term')"
+);
+$stmt2 = $stmts2->fetchAll();
+
+$stmts3 = $con_result[1]->query(
+"SELECT term_id FROM wp_term_taxonomy WHERE parent IN (SELECT term_id FROM wp_term_taxonomy WHERE parent IN (SELECT term_id FROM wp_term_taxonomy WHERE parent = '$area_term'))"
+);
+$stmt3 = $stmts3->fetchAll();
+
+$stmt = array_merge($stmt1,$stmt2,$stmt3);
+
+if( !empty($stmt) ){
+foreach($stmt as $key=> $val){
+
+if( $key !== count($stmt)-1 ){
+$val_str .= $val["term_id"]."," ;
+}else{
+$val_str .= $val["term_id"] ;
+}
+
+}
+}
+
+echo $val_str;
+// var_dump($stmt);
+
+$con_result[1]->commit();
+}else{
+echo "SQL_ERROR";
+}
+
+}else if( isset($_POST["Admin_Pref_Changer_Action"]) ){
+
+$area_term = $_POST["Area_Term"];
+$con_result = Connect();
+
+if($con_result[0]==="SUCCESS"){
+$con_result[1]->beginTransaction();
+
+$stmts1 = $con_result[1]->query(
+	"SELECT parent FROM wp_term_taxonomy WHERE term_id = '$area_term' "
+);
+$stmt1 = $stmts1->fetchAll();
+
+$stmts2 = $con_result[1]->query(
+"SELECT term_id FROM wp_term_taxonomy WHERE parent = '$area_term'"
+);
+$stmt2 = $stmts2->fetchAll();
+
+$stmts3 = $con_result[1]->query(
+"SELECT term_id FROM wp_term_taxonomy WHERE parent IN (SELECT term_id FROM wp_term_taxonomy WHERE parent = '$area_term')"
+);
+$stmt3 = $stmts3->fetchAll();
+
+
+$stmt = array();
+$stmt = array_merge( $stmt,$stmt1,$stmt2,$stmt3 ) ;
+
+if( !empty($stmt) ){
+foreach($stmt as $key=> $val){
+
+if( $key !== count($stmt)-1 ){
+$val_str .= $val[0]."," ;
+}else{
+$val_str .= $val[0] ;
+}
+
+}
+}
+
+echo $val_str;
+// var_dump($stmt);
+
+$con_result[1]->commit();
+}else{
+echo "SQL_ERROR";
+}
+
+
+}else if( isset($_POST["Admin_City_Changer_Action"]) ){
+
+$area_term = $_POST["Area_Term"];
+
+$con_result = Connect();
+
+if($con_result[0]==="SUCCESS"){
+$con_result[1]->beginTransaction();
+
+##市町村選択 : 大エリア / 区選択 : 都道府県
+$stmts1 = $con_result[1]->query(
+"SELECT parent FROM wp_term_taxonomy WHERE term_id
+IN (SELECT parent FROM wp_term_taxonomy WHERE term_id = '$area_term')"
+);
+$stmt1 = $stmts1->fetchAll();
+
+##市町村選択 : NULL  / 区選択 : 大エリア
+$stmts1_ku = $con_result[1]->query(
+"SELECT parent FROM wp_term_taxonomy WHERE term_id
+IN (SELECT parent FROM wp_term_taxonomy WHERE term_id
+IN (SELECT parent FROM wp_term_taxonomy WHERE term_id = '$area_term'))"
+);
+$stmt1_ku = $stmts1_ku->fetchAll();
+
+##市町村選択 : 都道府県  / 区選択 : 政令市
+$stmts2 = $con_result[1]->query(
+"SELECT parent FROM wp_term_taxonomy WHERE term_id = '$area_term'"
+);
+$stmt2 = $stmts2->fetchAll();//48
+
+
+##市町村選択→親都道府県→親大エリア→子都道府県→子市町村全て  / 区選択 : NULL
+$stmts4 = $con_result[1]->query(
+"SELECT term_id FROM wp_term_taxonomy WHERE parent
+IN (SELECT term_id FROM wp_term_taxonomy WHERE parent
+IN (SELECT parent FROM wp_term_taxonomy WHERE term_id
+IN (SELECT parent FROM wp_term_taxonomy WHERE term_id = '$area_term')))"
+);
+$stmt4 = $stmts4->fetchAll();
+
+##区選択→親政令市選択→親都道府県→親大エリア→子都道府県→子市町村→区の全て  / 市町村選択 : NULL
+$stmts5 = $con_result[1]->query(
+"SELECT    term_id FROM wp_term_taxonomy WHERE parent
+IN (SELECT term_id FROM wp_term_taxonomy WHERE parent
+IN (SELECT term_id FROM wp_term_taxonomy WHERE parent
+IN (SELECT parent  FROM wp_term_taxonomy WHERE term_id
+IN (SELECT parent  FROM wp_term_taxonomy WHERE term_id = '$area_term'))))"
+);
+$stmt5 = $stmts5->fetchAll();
+
+###選択
+$stmt = array();
+$stmt = array_merge( $stmt,$stmt1,$stmt2,$stmt1_ku) ;//JSのProp配列関係あり
+
+
+##市町村選択→都道府県 :大エリア出力  / 区選択→政令市 : 都道府県出力
+if( !empty($stmt) ){
+foreach($stmt as $key=> $val){
+if( $key !== count($stmt)-1 ){
+$val_str .= $val[0]."," ;
+}else{
+$val_str .= $val[0] ;
+}
+}
+}//親エリア
+
+##市町村選択から親の都道府県から子の市町村全ての取り出し
+##市町村選択→親都道府県→子市町村  / 区選択→親政令市→子の区すべて
+if(count($stmt2) === 1){
+$stmt2_val = $stmt2["parent"] ;
+$stmts_3 = $con_result[1]->query(
+"SELECT term_id FROM wp_term_taxonomy
+WHERE parent IN (SELECT parent FROM wp_term_taxonomy WHERE term_id = '$area_term')"
+);
+$stmt_3 = $stmts_3->fetchAll();
+}
+
+###削除処理
+##市町村選択→親都道府県→子市町村全出力   / 区選択→親政令市→子の区すべてを出力
+if( !empty($stmt_3) ){
+foreach($stmt_3 as $key=> $val){
+if( $key !== count($stmt_3)-1 ){
+$val_str2 .= $val[0]."," ;
+}else{
+$val_str2 .= $val[0] ;
+}
+}
+}//親エリア
+
+
+##市町村選択($stmt4)→親都道府県→子市町村全出力   / 区選択($stmt5)→親政令市→子の区すべてを出力
+$stmt6 = array();
+$stmt6 = array_merge( $stmt6,$stmt4,$stmt5 ) ;
+
+if( !empty($stmt6)  ){
+foreach($stmt6 as $key=> $val){
+if( $key !== count($stmt6)-1 ){
+$val_str3 .= $val[0]."," ;
+}else{
+$val_str3 .= $val[0] ;
+}
+}
+}//親エリア
+
+
+// ##区の削除選択用
+##市町村選択→判定NG  / 区選択→政令市→都道府県→子市町村全て
+if( $stmt1_ku[0]["parent"] !== "0" ){//区選択
+
+$stmts7 = $con_result[1]->query(
+"SELECT    term_id FROM wp_term_taxonomy WHERE parent
+IN (SELECT parent  FROM wp_term_taxonomy WHERE term_id
+IN (SELECT parent  FROM wp_term_taxonomy WHERE term_id = '$area_term'))"
+);
+$stmt7 = $stmts7->fetchAll();
+
+foreach($stmt7 as $key=> $val){
+if( $key !== count($stmt7)-1 ){
+$val_str4 .= $val[0]."," ;
+}else{
+$val_str4 .= $val[0] ;
+}
+}
+
+}
+
+// var_dump($stmt_3);
+if( $_POST["FLAG"] === "CHECKED_TRUE" ){
+
+echo $val_str;
+
+}else{
+
+if( $stmt1_ku[0]["parent"] === "0" ){//市町村選択
+echo $val_str.",REMOVE_PREF:".$val_str2.",REMOVE_REGION:".$val_str3;
+}else{
+echo $val_str.",REMOVE_CITY:".$val_str4 ;
+}
+
+
+}//else_flag
+
+$con_result[1]->commit();
+
+}else{
+echo "SQL_ERROR";
+}
+
+
+}else if( isset($_POST["Admin_Tab_Changer_Action"]) ){
+
+
+$con_result = Connect();
+
+if($con_result[0]==="SUCCESS"){
+$con_result[1]->beginTransaction();
+
+$area_term_r = $_POST["Area_Term"][0];
+$area_term_p = $_POST["Area_Term"][1];
+$area_term_c = $_POST["Area_Term"][2];
+
+
+$stmts = $con_result[1]->query(
+"SELECT term_id FROM wp_term_taxonomy WHERE parent = $area_term_r"
+);
+$pref = $stmts->fetchAll();
+
+
+foreach($pref as $key=>$val){
+
+$stmts2 = $con_result[1]->query(
+"SELECT term_id FROM wp_term_taxonomy WHERE parent = $val[0]"
+);
+
+$city[$val[0]] = $stmts2->fetchAll();//152
+
+}
+
+##### 区
+foreach($city as $key=>$val){
+foreach($val as $key2=>$val2){
+
+// echo $key2." : ".$val2[0]."\n";
+$stmts3 = $con_result[1]->query(
+"SELECT term_id FROM wp_term_taxonomy WHERE parent = $val2[0]"
+);
+$ku[$val2[0]] = $stmts3->fetchAll();//152
+}
+}
+
+
+foreach($pref as $key=>$val){
+
+$co = count( $pref );
+if( $key !== $co-1  ){
+$pref_str .= $val[0].",";
+}else{
+$pref_str .= $val[0];
+}
+
+}
+
+foreach($city as $key=>$val){
+
+$co = count( $city[$key] );
+for($i=0; $i<$co; $i++){
+
+$city_str .= $key.":".$city[$key][$i]["term_id"].",";
+
+}
+
+}
+
+foreach($ku as $key=>$val){
+
+$co = count( $ku[$key] );
+for($i=0; $i<$co; $i++){
+$ku_str .= $key.":".$ku[$key][$i]["term_id"]."," ;
+}
+}//foreach
+
+
+// var_dump($ku);
+echo $pref_str.",CITY:".$city_str.",DIVISION:".$ku_str;
+
+$con_result[1]->commit();
+}//connection
+
+
+//### 全国エリア対応
+}else if( isset($_POST["Admin_Tab_Changer_All_Action"]) ){
+$con_result = Connect();
+
+if($con_result[0]==="SUCCESS"){
+$con_result[1]->beginTransaction();
+
+$area_term = $_POST["Area_Term"];
+$co = count($area_term);
+// $area_term_r = $_POST["Area_Term"][$co][0];
+// $area_term_p = $_POST["Area_Term"][1];
+// $area_term_c = $_POST["Area_Term"][2];
+
+foreach($area_term as $key=>$val){
+
+switch($key){
+case $key :
+$region = $area_term[$key][0];
+$stmts = $con_result[1]->query(
+"SELECT term_id FROM wp_term_taxonomy WHERE parent = $region"
+);
+$pref[$key] = $stmts->fetchAll();
+break;
+}
+}
+
+foreach($pref as $key=>$val){
+foreach($val  as $key2=>$val2){
+
+switch($key){
+case $key :
+if($key2===0){
+$pref_str .= "PREF_KEY:".$val2[0]."," ;
+}else{
+$pref_str .= $val2[0].",";
+}
+break;
+}//s
+
+}
+}
+
+foreach($pref as $key=>$val){
+foreach($val  as $key2=>$val2){
+
+switch($key){
+case $key :
+$stmts2 = $con_result[1]->query(
+"SELECT term_id FROM wp_term_taxonomy WHERE parent = $val2[0]"
+);
+$city[$key][$val2[0]] = $stmts2->fetchAll();
+break;
+}//s
+
+}
+}
+
+// var_dump($city);
+
+foreach($city as $key=>$val){
+foreach($val  as $key2=>$val2){
+foreach($val2  as $key3=>$val3){
+
+switch($key){
+case $key :
+if($key3===0){
+$city_str .= "CITY_KEY:".$key2.":".$val3[0]."," ;
+}else{
+$city_str .= $key2.":".$val3[0].",";
+}
+
+$stmts3 = $con_result[1]->query(
+"SELECT term_id FROM wp_term_taxonomy WHERE parent = $val3[0]"
+);
+$ku[$key][$val3[0]] = $stmts3->fetchAll();
+
+break;
+}//s
+}}}
+
+foreach($ku as $key=>$val){
+foreach($val  as $key2=>$val2){
+foreach($val2  as $key3=>$val3){
+
+switch($key){
+case $key :
+if($key3===0){
+$ku_str .= "DIVISION_KEY:".$key2.":".$val3[0]."," ;
+}else{
+$ku_str .= $key2.":".$val3[0].",";
+}
+
+break;
+}//s
+}}}
+
+
+
+
+echo $pref_str."CITY:".$city_str."DIVISION:".$ku_str;
+// echo $pref_str."CITY:".$city_str."DIVISION:";
+
+// var_dump($ku);
+
+
+
+$con_result[1]->commit();
+}
+
+
+
+
+
+}//isset
+
+
+
+}//request
+}//func
+add_action('wp_ajax_Admin_Area_Changer_Action', 'Admin_Area_Changer_Recieve');
+add_action('wp_ajax_nopriv_Admin_Area_Changer_Action', 'Admin_Area_Changer_Recieve');
+
+
+?>
